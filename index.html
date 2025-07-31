@@ -1,0 +1,504 @@
+<style>
+	/* .previous-button,
+	.next-button {
+		position: absolute;
+		top: 50%;
+		width: 40px;
+		height: 40px;
+		margin-top: -20px;
+		z-index: 1000;
+		cursor: pointer;
+		background-color: rgba(0, 0, 0, 0.2);
+		border-radius: 20px;
+	} */
+
+	.magazine-viewport {
+		width: 100vw;
+		height: 100vh;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.magazine {
+		width: 100%;
+		height: 100%;
+	}
+
+	.close {
+		position: absolute !important;
+		top: 1%;
+		left: 1%;
+		position: relative;
+		background-color: rgba(0, 0, 0, 0.2);
+		padding: 10px;
+		border-radius: 0 0 10px 0;
+		cursor: pointer;
+		z-index: 100;
+	}
+
+	@media screen and (max-width: 1050px) {
+		.close {
+			width: 100px;
+			height: 100px;
+			font-size: 2em;
+		}
+	}
+</style>
+
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+
+	<title>Nós na rede</title>
+	<meta name="viewport" content="width = 1050, user-scalable = no" />
+	<!-- <link rel="icon" type="image/png" href="../../pics/favicon.png" /> -->
+	<script type="text/javascript" src="extras/jquery.min.1.7.js"></script>
+	<script type="text/javascript" src="extras/jquery-ui-1.8.20.custom.min.js"></script>
+	<script type="text/javascript" src="extras/modernizr.2.5.3.min.js"></script>
+	<script type="text/javascript" src="lib/hash.js"></script>
+
+	<style>
+		/* @media (max-width: 768px) {
+			.atividade {
+				position: fixed !important;
+				top: 0 !important;
+				left: 0 !important;
+				width: 100vw !important;
+				height: 100vh !important;
+				z-index: 9999 !important;
+				background: white;
+			}
+		} */
+	</style>
+</head>
+
+<body>
+
+	<div id="canvas">
+
+		<div class="zoom-icon zoom-icon-in">
+		</div>
+		<!-- <button class="close fechar borda-estilizada-janela" onclick="window.close()">X</button> -->
+
+		<script>
+			function downloadPDF() {
+				var link = document.createElement('a');
+				link.href = "pdf/AULA_1_AP.pdf";
+				link.download = "AULA_1_AP.pdf";
+				link.dispatchEvent(new MouseEvent('click'));
+			}
+		</script>
+
+		<div class="magazine-viewport">
+			<div class="container">
+
+				<div class="magazine">
+					<!-- Next button -->
+					<div ignore="1" class="next-button" style="display: none;"></div>
+					<!-- Previous button -->
+					<div ignore="1" class="previous-button" style="display: none;"></div>
+				</div>
+
+				<div class="atividade" style="display: none;"></div>
+			</div>
+			<div class="bottom">
+				<div id="slider-bar" class="turnjs-slider">
+					<div id="slider"></div>
+				</div>
+			</div>
+		</div>
+
+		<script type="text/javascript">
+
+			function loadApp() {
+
+				$('#canvas').fadeIn(1000);
+
+				var flipbook = $('.magazine');
+
+				// Check if the CSS was already loaded
+
+				if (flipbook.width() == 0 || flipbook.height() == 0) {
+					setTimeout(loadApp, 10);
+					return;
+				}
+
+				//Create the flipbook
+				var bookWidth, bookHeight;
+				var screenWidth = $(window).width();
+
+				bookWidth = screenWidth * 0.9; // 90% da largura da tela
+				bookHeight = bookWidth;        // Proporção 1:1 (quadrado)
+				console.log('mobile ', $(window).width());
+
+				flipbook.turn({
+
+					// Magazine width
+
+					width: 1298,
+					height: 649,
+
+
+					// Duration in millisecond
+
+					duration: 1000,
+
+					// Enables gradients
+
+					gradients: true,
+
+					// Auto center this flipbook
+
+					autoCenter: true,
+
+					// Elevation from the edge of the flipbook when turning a page
+
+					elevation: 50,
+
+					// The number of pages
+
+					pages: 26,
+
+					// Events
+
+					when: {
+						turning: function (event, page, view) {
+
+							var book = $(this),
+								currentPage = book.turn('page'),
+								pages = book.turn('pages');
+
+							// Update the current URI
+
+							Hash.go('page/' + page).update();
+
+							// Show and hide navigation buttons
+
+							disableControls(page);
+
+						},
+
+						turned: function (event, page, view) {
+
+							disableControls(page);
+
+							$(this).turn('center');
+
+							$('#slider').slider('value', getViewNumber($(this), page));
+
+							if (page == 1) {
+								$(this).turn('peel', 'br');
+							}
+
+							loadScript(page);
+						},
+
+						missing: function (event, pages) {
+
+							// Add pages that aren't in the magazine
+
+							for (var i = 0; i < pages.length; i++)
+								addPage(pages[i], $(this));
+
+						}
+					}
+
+				});
+
+				// Zoom.js
+
+				$('.magazine-viewport').zoom({
+					flipbook: $('.magazine'),
+
+					max: function () {
+
+						return largeMagazineWidth() / $('.magazine').width();
+
+					},
+
+					when: {
+						swipeLeft: function () {
+
+							$(this).zoom('flipbook').turn('next');
+
+						},
+
+						swipeRight: function () {
+
+							$(this).zoom('flipbook').turn('previous');
+
+						},
+
+						resize: function (event, scale, page, pageElement) {
+
+							if (scale == 1)
+								loadSmallPage(page, pageElement);
+							else
+								loadLargePage(page, pageElement);
+
+						},
+
+						zoomIn: function () {
+
+							$('#slider-bar').hide();
+							$('.made').hide();
+							$('.magazine').removeClass('animated').addClass('zoom-in');
+							$('.zoom-icon').removeClass('zoom-icon-in').addClass('zoom-icon-out');
+
+							if (!window.escTip && !$.isTouch) {
+								escTip = true;
+
+								$('<div />', { 'class': 'exit-message' }).
+									html('<div>Press ESC to exit</div>').
+									appendTo($('body')).
+									delay(2000).
+									animate({ opacity: 0 }, 500, function () {
+										$(this).remove();
+									});
+							}
+						},
+
+						zoomOut: function () {
+
+							$('#slider-bar').fadeIn();
+							$('.exit-message').hide();
+							$('.made').fadeIn();
+							$('.zoom-icon').removeClass('zoom-icon-out').addClass('zoom-icon-in');
+
+							setTimeout(function () {
+								$('.magazine').addClass('animated').removeClass('zoom-in');
+								resizeViewport();
+							}, 0);
+
+						}
+					}
+				});
+
+				function resizeFlipbook() {
+					const width = window.innerWidth;
+					const height = window.innerHeight;
+
+					$('.magazine').turn('size', width, height);
+				}
+				$(window).on('resize orientationchange', function () {
+					resizeFlipbook();
+				});
+
+
+				// Zoom event
+
+				// if ($.isTouch)
+				// 	$('.magazine-viewport').bind('zoom.doubleTap', zoomTo);
+				// else
+				// $('.magazine-viewport').bind('zoom.tap', zoomTo);
+
+				if ($.isTouch) {
+					$('.magazine-viewport').bind('zoom.doubleTap', zoomTo);
+				} else {
+					$('.magazine-viewport').on('dblclick', zoomTo);
+				}
+
+
+
+				// Using arrow keys to turn the page
+
+				$(document).keydown(function (e) {
+
+					var previous = 37, next = 39, esc = 27;
+
+					switch (e.keyCode) {
+						case previous:
+
+							// left arrow
+							$('.magazine').turn('previous');
+							e.preventDefault();
+
+							break;
+						case next:
+
+							//right arrow
+							$('.magazine').turn('next');
+							e.preventDefault();
+
+							break;
+						case esc:
+
+							$('.magazine-viewport').zoom('zoomOut');
+							e.preventDefault();
+
+							break;
+					}
+				});
+
+				// URIs - Format #/page/1 
+
+				Hash.on('^page\/([0-9]*)$', {
+					yep: function (path, parts) {
+						var page = parts[1];
+
+						if (page !== undefined) {
+							if ($('.magazine').turn('is'))
+								$('.magazine').turn('page', page);
+						}
+
+					},
+					nop: function (path) {
+
+						if ($('.magazine').turn('is'))
+							$('.magazine').turn('page', 1);
+					}
+				});
+
+
+				$(window).resize(function () {
+					resizeViewport();
+				}).bind('orientationchange', function () {
+					resizeViewport();
+				});
+
+				// Regions
+
+				if ($.isTouch) {
+					$('.magazine').bind('touchstart', regionClick);
+				} else {
+					$('.magazine').click(regionClick);
+				}
+
+				// Events for the next button
+
+				$('.next-button').bind($.mouseEvents.over, function () {
+
+					$(this).addClass('next-button-hover');
+
+				}).bind($.mouseEvents.out, function () {
+
+					$(this).removeClass('next-button-hover');
+
+				}).bind($.mouseEvents.down, function () {
+
+					$(this).addClass('next-button-down');
+
+				}).bind($.mouseEvents.up, function () {
+
+					$(this).removeClass('next-button-down');
+
+				}).click(function () {
+
+					$('.magazine').turn('next');
+
+				});
+
+				// Events for the next button
+
+				$('.previous-button').bind($.mouseEvents.over, function () {
+
+					$(this).addClass('previous-button-hover');
+
+				}).bind($.mouseEvents.out, function () {
+
+					$(this).removeClass('previous-button-hover');
+
+				}).bind($.mouseEvents.down, function () {
+
+					$(this).addClass('previous-button-down');
+
+				}).bind($.mouseEvents.up, function () {
+
+					$(this).removeClass('previous-button-down');
+
+				}).click(function () {
+
+					$('.magazine').turn('previous');
+
+				});
+
+
+				// Slider
+
+				$("#slider").slider({
+					min: 1,
+					max: numberOfViews(flipbook),
+
+					start: function (event, ui) {
+
+						if (!window._thumbPreview) {
+							_thumbPreview = $('<div />', { 'class': 'thumbnail' }).html('<div></div>');
+							setPreview(ui.value);
+							_thumbPreview.appendTo($(ui.handle));
+						}
+						else
+							setPreview(ui.value);
+
+						moveBar(false);
+
+					},
+
+					slide: function (event, ui) {
+
+						setPreview(ui.value);
+
+					},
+
+					stop: function () {
+
+						if (window._thumbPreview)
+							_thumbPreview.removeClass('show');
+
+						$('.magazine').turn('page', Math.max(1, $(this).slider('value') * 2 - 2));
+
+					}
+				});
+
+				resizeViewport();
+
+				$('.magazine').addClass('animated');
+
+			}
+
+			// Zoom icon
+
+			$('.zoom-icon').bind('mouseover', function () {
+
+				if ($(this).hasClass('zoom-icon-in'))
+					$(this).addClass('zoom-icon-in-hover');
+
+				if ($(this).hasClass('zoom-icon-out'))
+					$(this).addClass('zoom-icon-out-hover');
+
+			}).bind('mouseout', function () {
+
+				if ($(this).hasClass('zoom-icon-in'))
+					$(this).removeClass('zoom-icon-in-hover');
+
+				if ($(this).hasClass('zoom-icon-out'))
+					$(this).removeClass('zoom-icon-out-hover');
+
+			}).bind('click', function () {
+
+				if ($(this).hasClass('zoom-icon-in'))
+					$('.magazine-viewport').zoom('zoomIn');
+				else if ($(this).hasClass('zoom-icon-out'))
+					$('.magazine-viewport').zoom('zoomOut');
+
+			});
+
+			$('#canvas').hide();
+
+			// resizeViewport();
+
+
+			// Load the HTML4 version if there's not CSS transform
+
+			yepnope({
+				test: Modernizr.csstransforms,
+				yep: ['lib/turn.min.js'],
+				nope: ['lib/turn.html4.min.js', 'css/jquery.ui.html4.css'],
+				both: ['lib/zoom.js', 'css/jquery.ui.css', 'js/magazine.js', 'css/magazine.css'],
+				complete: loadApp
+			});
+
+		</script>
+</body>
+
+</html>
